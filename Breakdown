@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Breakdown Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f4f6f9; }
+    header { background:#d62828; color:white; padding:1rem; text-align:center; font-size:1.8rem; }
+    .container { width:90%; max-width:1000px; margin:20px auto;}
+    table { width:100%; border-collapse: collapse; background:white; box-shadow:0 0 10px rgba(0,0,0,0.1); border-radius:8px; overflow:hidden;}
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left;}
+    th { background:#e63946; color:white;}
+    tr:hover { background:#f1f1f1;}
+    .charts { display:flex; flex-wrap:wrap; gap:2rem; justify-content: space-around; }
+    canvas { background:white; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <header>📊 Breakdown Dashboard</header>
+  <div class="container">
+    <div class="charts">
+      <canvas id="weeklyBar" width="400" height="300"></canvas>
+      <canvas id="personPie" width="400" height="300"></canvas>
+    </div>
+    <table id="sheetTable"></table>
+  </div>
+
+  <script>
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTDCfIsDKCbZuJ0dxUQEDBBZB6tWRr8N-Qd7AK5S08VZsx-_Zp4q-VAso4jrPshMPts4tKBUWPqPcNK/pub?output=csv";
+
+    async function loadData() {
+      const res = await fetch(csvUrl);
+      const text = await res.text();
+      const rows = text.trim().split("\n").map(r => r.split(","));
+      const headers = rows.shift();
+
+      const data = rows
+        .map(r => ({
+          Week: r[0], Person: r[1], Type: r[2], Count: +r[3] || 0
+        }))
+        .filter(r => r.Type === "Breakdown");
+
+      renderTable(data, headers);
+      renderCharts(data);
+    }
+
+    function renderTable(data, headers) {
+      const tbl = document.getElementById("sheetTable");
+      let html = "<tr>";
+      headers.forEach(h => html += `<th>${h}</th>`);
+      html += "</tr>";
+      data.forEach(r => {
+        html += "<tr>";
+        headers.forEach(h => html += `<td>${r[h] || ""}</td>`);
+        html += "</tr>";
+      });
+      tbl.innerHTML = html;
+    }
+
+    function renderCharts(data) {
+      const byWeek = {};
+      const byPerson = {};
+      data.forEach(r => {
+        byWeek[r.Week] = (byWeek[r.Week] || 0) + r.Count;
+        byPerson[r.Person] = (byPerson[r.Person] || 0) + r.Count;
+      });
+      const weeks = Object.keys(byWeek).sort();
+      const persons = Object.keys(byPerson);
+
+      new Chart(document.getElementById("weeklyBar"), {
+        type: "bar",
+        data: {
+          labels: weeks,
+          datasets: [{ label:"Breakdown Count", data: weeks.map(w=>byWeek[w]), backgroundColor:"#e63946" }]
+        },
+        options: { responsive: true, plugins: { legend:{display:false} } }
+      });
+
+      new Chart(document.getElementById("personPie"), {
+        type: "pie",
+        data: {
+          labels: persons,
+          datasets: [{ data: persons.map(p=>byPerson[p]), backgroundColor: persons.map((_,i)=>`hsl(${i*60},70%,60%)`) }]
+        },
+        options: { responsive: true }
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
